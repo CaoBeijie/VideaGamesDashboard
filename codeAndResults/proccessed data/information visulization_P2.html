@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Load Bootstrap CSS and JavaScript -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <!-- Color Scale -->
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+</head>
+<style>
+    .x-axis line,
+    .x-axis path,
+    .y-axis line,
+    .y-axis path {
+        stroke: #333;
+        /* Set the color of the axes lines */
+    }
+
+    .x-axis text,
+    .y-axis text {
+        fill: #333;
+        /* Set the color of the axes labels */
+        font-size: 16px;
+        /* Set the font size of the axes labels */
+        font-family: 'Arial', sans-serif;
+        /* Set the font family of the axes labels */
+    }
+
+    #my_dataviz {
+        display: inline;
+    }
+
+    #dropDownMenu {
+        position: absolute;
+        top: 65%;
+        left: 2%;
+        width: 20%;
+    }
+
+    select {
+        width: 40%;
+        border: 3px solid #00007f;
+        border-radius: 0.1875rem;
+        font-size: 150%;
+        text-indent: 10px;
+    }
+
+    /*
+ * Custom translucent site header
+ */
+
+    .site-header {
+        background-color: rgba(0, 0, 0, .85);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        backdrop-filter: saturate(180%) blur(20px);
+    }
+
+    .site-header a {
+        color: #999;
+        transition: ease-in-out color .15s;
+    }
+
+    .site-header a:hover {
+        color: #fff;
+        text-decoration: none;
+    }
+
+    #my_dataviz1 {
+        display: flex;
+        justify-content: center;
+    }
+
+    #slider {
+        position: relative;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+</style>
+
+<body>
+
+    <!--generate the nav bar-->
+    <nav class="site-header sticky-top py-1">
+        <div class="container d-flex flex-column flex-md-row justify-content-between">
+            <a class="navbar-brand" href="#">
+                <img src="data_image.png" alt="Bootstrap" width="24" height="24">
+            </a>
+
+            <a class="py-2 d-none d-md-inline-block" href="#">Linegraph</a>
+            <a class="py-2 d-none d-md-inline-block" href="#">Stackbar</a>
+            <a class="py-2 d-none d-md-inline-block" href="#">Year filter</a>
+            <a class="py-2 d-none d-md-inline-block" href="#">Bubble chart</a>
+
+        </div>
+    </nav>
+    <!--the introduction section-->
+    <!--referece of the graphs https://d3-graph-gallery.com/graph/barplot_stacked_hover.html 
+
+https://d3-graph-gallery.com/graph/line_select.html 
+
+ -->
+    <div class="position-relative overflow-hidden p-3 p-md-5 m-md-3 text-center bg-light">
+        <div class="col-md-8 p-lg-5 mx-auto my-5">
+            <h1 class="display-4 font-weight-normal" style="margin-bottom: 3rem;">GAME SALES DATA VISUALIZATION PROJECT
+            </h1>
+            <p class="lead font-weight-normal">The objective of this project is to employ data visualization techniques,
+                namely yearline, bubble chart, stacked bar chart, and linegraph, to effectively present pertinent
+                information derived from given attributes. The visualization tools are intended to showcase the
+                distribution, comparison, and trend of the data.</p>
+        </div>
+        <div class="product-device box-shadow d-none d-md-block"></div>
+        <div class="product-device product-device-2 box-shadow d-none d-md-block"></div>
+    </div>
+
+
+    <svg width="1200" height='600' id="bubbleChart" class="svg1"></svg>
+    <div id="my_dataviz"></div>
+    <div>
+        <div id="my_dataviz1"></div>
+        <input type="range" id="slider" min="0" max="3" step="1" value="0">
+        <script>
+            // set the dimensions and margins of the graph
+            const margin = { top: 100, right: 30, bottom: 30, left: 60 },
+                width = 1400,
+                height = 400 - margin.top - margin.bottom;
+
+            // Add the slider input
+            const slider = d3.select("#slider");
+
+            // append the svg object to the body of the page
+            const svg = d3.select("#my_dataviz1")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")");
+
+            //Read the data
+            d3.csv("sum_sales.csv").then(function (data) {
+
+                // List of groups (here I have one group per column)
+                var allGroup = ["NA_Sales", "EU_Sales", "JP_Sales", "Global_Sales"]
+
+                // A color scale: one color for each group
+                const myColor = d3.scaleOrdinal()
+                    .domain(allGroup)
+                    .range(d3.schemeSet2);
+
+
+                // Add X axis --> it is a date format
+                const x = d3.scaleLinear()
+                    .domain(d3.extent(data, d => d.Year))
+                    .range([0, width]);
+                svg.append("g")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(d3.axisBottom(x).ticks(7));
+
+                // Add Y axis
+                const y = d3.scaleLinear()
+                    .domain([0, d3.max(data, d => +d.Global_Sales)])
+                    .range([height, 0]);
+                svg.append("g")
+                    .call(d3.axisLeft(y));
+
+
+                // Function to create grid lines
+                function make_y_gridlines(y) {
+                    return d3.axisLeft(y)
+                        .ticks(5);
+                }
+                // Add y-axis grid lines
+                svg.append("g")
+                    .attr("class", "grid")
+                    .call(make_y_gridlines(y)
+                        .tickSize(-width)
+                        .tickFormat("")
+                    )
+                    .style("stroke-dasharray", "3,3")
+                    .style("stroke-opacity", 0.5); // Add opacity to the grid lines
+
+
+                // Initialize line with first group of the list
+                const line = svg
+                    .append('g')
+                    .append("path")
+                    .datum(data)
+                    .attr("d", d3.line()
+                        .x(d => x(parseInt(d.Year)))
+                        .y(d => y(parseFloat(d[allGroup[0]]))) // Use the first sales column by default
+                    )
+                    .attr("stroke", d => myColor(allGroup[0]))
+                    .style("stroke-width", 4)
+                    .style("fill", "none");
+
+                // A function that updates the chart
+                function update(selectedGroup) {
+                    // Give new data to update the line
+                    line
+                        .datum(data)
+                        .transition()
+                        .duration(1000)
+                        .attr("d", d3.line()
+                            .x(d => x(parseInt(d.Year)))
+                            .y(d => y(parseFloat(d[selectedGroup]))) // Use the selected sales column
+                        )
+                        .attr("stroke", d => myColor(selectedGroup));
+                }
+                // When the slider is changed, run the updateChart function
+                slider.on("input", function () {
+                    // Recover the option that has been chosen
+                    const selectedOption = allGroup[parseInt(this.value)];
+                    // Run the updateChart function with this selected option
+                    update(selectedOption);
+                });
+
+                // Add legend
+                const legend = svg.selectAll(".legend")
+                    .data(allGroup)
+                    .enter()
+                    .append("g")
+                    .attr("class", "legend")
+                    .attr("transform", (d, i) => "translate(" + (width - 150) + "," + (20 * i + 10) + ")");
+
+                legend.append("rect")
+                    .attr("width", 18)
+                    .attr("height", 18)
+                    .style("fill", myColor);
+
+                legend.append("text")
+                    .attr("x", 24)
+                    .attr("y", 9)
+                    .attr("dy", ".35em")
+                    .style("font-size", "12px")
+                    .text(d => d);
+
+            });
+        </script>
+    </div>
+
+</body>
+
+
+<script>
+    (async () => {
+        // Define the path to the CSV file
+        const dataPath = "vgsales_bubble.csv";
+        const dataPath_year = 'vgsales.csv';
+        const svg2 = d3.select('#year');
+
+
+        const myData = await d3.csv(dataPath);
+        const data_year = await d3.csv(dataPath_year);
+
+        console.log(myData);
+
+        const svg = d3.select('#bubbleChart');
+        let width = +svg.attr('width');
+        let height = +svg.attr('height');
+        const year_magin_width = +svg.attr('width');
+        const margin = { top: 40, right: 30, bottom: 60, left: 70 };
+        const innerWidth = width - margin.left - margin.right - 600;
+        const innerHeight = height - margin.top - margin.bottom;
+
+        const innerWidth_year = width - margin.left - margin.right;
+        const innerHeight_year = height - margin.top - margin.bottom;
+
+
+        const yScale_year = d3.scaleBand()
+            .domain(data_year.map(d => d.Year))
+            .range([0, innerHeight]);
+        const xScale = d3.scaleLinear()
+            .domain([0, d3.max(myData, d => +d.Global_Sales)])
+            .range([0, innerWidth]);
+
+        const yScale = d3.scaleBand()
+            .domain(myData.map(d => d.Genre))
+            .range([0, innerHeight]);
+
+        //refect radius
+        let rScale = d3.scaleLinear()
+            .domain([-2, d3.max(myData, d => d.Global_Sales)])
+            .range([0, 20]);
+
+        const rScale_year = d3.scaleLinear()
+            .domain([-2, d3.max(data_year, d => Math.abs(d.log_GlobalSales))])
+            .range([0, 20]);
+
+
+
+        const colorScale = d3.scaleOrdinal()
+            .domain(myData.map(d => d.Platform))
+            .range(['#3C76AF', '#549E3F', '#EE9F9B', '#D0352B', '#F4C17B', '#EE8632', '#C6B3D3']);
+
+        let colorScale_year = d3.scaleOrdinal()
+            .domain([d3.range(10)])
+            .range(['#D0352B', '#549E3F']);
+
+
+        //add g
+        const g = svg.append('g')
+            .attr('id', 'bubbleChart')
+            .attr('height', innerHeight)
+            .attr('width', innerWidth)
+            .attr('transform', `translate(${margin.left + 500},${margin.top})`);
+
+        const g_year = svg.append('g')
+            .attr('id', 'yearchart')
+            .attr('transform', `translate(${margin.left + 200},${margin.top})`);
+
+
+        //add x ang y axis into chart
+        const xAxis = d3.axisBottom(xScale); // use axisTop instead of axisBottom
+        g.append('g')
+            .attr('class', 'x_axis')
+            .call(xAxis)
+            .attr('transform', `translate(0, ${height - margin.bottom - margin.top})`); // move the axis to the top
+
+        const yAxis_year = d3.axisLeft(yScale_year);
+        g_year.append('g').call(yAxis_year);
+
+        const yAxis = d3.axisLeft(yScale);
+        g.append('g').call(yAxis);
+
+
+        const legend = g.selectAll(".legend")
+            .data(colorScale.domain())
+            .enter()
+            .append("g")
+            .attr("class", "legend")
+            .attr("transform", (d, i) => `translate(${margin.left + margin.right + 10}, ${i * 30})`)
+        // .attr('transform','rotate(0)');
+
+        legend.append("rect")
+            .attr("x", innerWidth - 18)
+            .attr("width", 18)
+            .attr("height", 18)
+            .style("fill", colorScale)
+            .style('display', 'inline-block')
+
+        legend.append("text")
+            .attr("x", innerWidth - 20)
+            .attr("y", 9)
+            .attr("dy", ".35em")
+            .style("text-anchor", "end")
+            .text(d => d);
+
+
+        const year = g_year.selectAll('circle')
+            .data(data_year)
+            .enter()
+            .append("circle")
+            .attr("cx", margin.left - 70)//70是圆心 
+            .attr("cy", d => yScale_year(d.Year) + yScale_year.bandwidth() / 2)
+            .attr("r", d => rScale_year(d.log_GlobalSales))
+            .attr("fill", d => {
+                if (d.Global_Sales >= 0) {
+                    return '#D0352B'
+                } else {
+                    return '#549E3F'
+                }
+            })
+            .attr("opacity", 0.8)
+            .append("title")
+            .text(d => d.Year + " - GS:" + d.Global_Sales)
+            .on('mouseover', (e, d) => {
+                console.log(data_year.Global_Sales);
+                d3.select('svg')
+                    .append('text')
+                    .attr('class', 'tooltip')
+                    .text(data_year.Year)
+                    .attr('x', x_scale(parseFloat(data_year.Global_Sales)) + 10)
+                    .attr('y', y_scale(parseFloat(data_year.Year)) + 10);
+            })
+            .on("mouseout", (e, d) => {
+                d3.selectAll('.tooltip')
+                    .remove();
+            })
+        function updatachart1(value) {
+            console.log(value);
+            let updata = data_year.filter(d => {
+                if (d.Year == value)
+                    return d;
+            })
+            g_year.selectAll('circle').remove();
+            g_year.append("circle")
+                .attr("cx", margin.left - 70)//
+                .attr("cy", yScale_year(updata[0].Year) + yScale_year.bandwidth() / 2)
+                .attr("r", rScale_year(updata[0].log_GlobalSales))
+                .attr("fill", colorScale_year(updata[0].Global_Sales))
+                .attr("opacity", 0.7)
+                .append("title")
+                .text(updata[0].Year + " - GS:" + updata[0].Global_Sales)
+                .on('mouseover', (e, d) => {
+                    console.log(updata[0].Global_Sales);
+                    d3.select('svg')
+                        .append('text')
+                        .attr('class', 'tooltip')
+                        .text(updata[0].Year)
+                        .attr('x', x_scale(parseFloat(updata[0].Global_Sales)) + 10)
+                        .attr('y', y_scale(parseFloat(updata[0].Year)) + 10);
+                })
+                .on("mouseout", (e, d) => {
+                    d3.selectAll('.tooltip')
+                        .remove();
+                })
+        }
+        //add bubble chart
+        const bubbles = g.selectAll("circle")
+            .data(myData)
+            .enter()
+            .append("circle")
+            .attr('class', 'buddlecircle')
+            .attr("cx", d => {
+                return xScale(d.Global_Sales)
+            })
+            .attr("cy", d => yScale(d.Genre) + yScale.bandwidth() / 2)
+            .attr("r", d => rScale(+d.Global_Sales))
+            .attr("fill", d => colorScale(d.Platform))
+            .attr("opacity", 0.7)
+            .append("title")
+            .text(d => d.Genre + " - " + d.Platform + ": " + d.Global_Sales)
+            .on('mouseover', (e, d) => {
+                console.log(myData.Genre);
+                d3.select('svg')
+                    .append('text')
+                    .attr('class', 'tooltip')
+                    .text(myData.Platform)
+                    .attr('x', x_scale(parseFloat(myData.Global_Sales)) + 10)
+                    .attr('y', y_scale(parseFloat(myData.Genre)) + 10);
+            })
+            .on("mouseout", (e, d) => {
+                d3.selectAll('.tooltip')
+                    .remove();
+            })
+        let selectvalue;
+        async function updatabuddle(value) {
+            let yeardata = await d3.csv('vgsales(1).csv');
+            let selectdata = yeardata.filter(d => {
+                if (d.Year == value)
+                    return d;
+            })
+            selectdata = d3.rollup(selectdata, (v) => {
+                return d3.rollup(v, (v2) => {
+                    return Math.floor(d3.sum(v2, d => d.Global_Sales))
+                }, d => d.Platform)
+            }, d => d.Genre)
+            let circledata = [];
+            selectdata.forEach((v, k) => {
+                v.forEach((v2, k2) => {
+                    circledata.push({ Genre: k, Platform: k2, Global_Sales: v2 })
+                })
+            })
+            d3.select('#bubbleChart').selectAll('.buddlecircle').remove();
+            d3.select('#bubbleChart').selectAll('.x_axis').remove();
+            xScale.domain([0, d3.max(circledata, d => +d.Global_Sales)]);
+            rScale.domain([0, d3.max(circledata, d => d.Global_Sales)]).range([0, 20])
+            g.append('g')
+                .attr('class', 'x_axis')
+                .call(d3.axisBottom(xScale))
+                .attr('transform', `translate(0, ${height - margin.bottom - margin.top})`)
+            g.selectAll("circle")
+                .data(circledata)
+                .enter()
+                .append("circle")
+                .attr('class', 'buddlecircle')
+                .attr("cx", d => {
+                    return xScale(d.Global_Sales)
+                })
+                .attr("cy", d => yScale(d.Genre) + yScale.bandwidth() / 2)
+                .attr("r", d => rScale(+d.Global_Sales))
+                .attr("fill", d => colorScale(d.Platform))
+                .attr("opacity", 0.7)
+                .append("title")
+                .text(d => d.Genre + " - " + d.Platform + ": " + d.Global_Sales)
+                .on('mouseover', (e, d) => {
+                    console.log(myData.Genre);
+                    d3.select('svg')
+                        .append('text')
+                        .attr('class', 'tooltip')
+                        .text(myData.Platform)
+                        .attr('x', x_scale(parseFloat(myData.Global_Sales)) + 10)
+                        .attr('y', y_scale(parseFloat(myData.Genre)) + 10);
+                })
+                .on("mouseout", (e, d) => {
+                    d3.selectAll('.tooltip')
+                        .remove();
+                })
+
+        }
+        // set the dimensions and margins of the graph
+        // const margin = { top: 10, right: 30, bottom: 20, left: 50 },
+        width3 = 550 - margin.left - margin.right,
+            height3 = 600 - margin.top - margin.bottom;
+
+        // append the svg object to the body of the page
+        const svg3 = d3.select("#my_dataviz")
+            .append("svg")
+            .attr("width", 250 + margin.left + margin.right + 300)
+            .attr("height", height3 + margin.top + margin.bottom)
+            .append("g")
+            .attr('class', 'svg3_g')
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Parse the Data
+        d3.csv("Barplot_data.csv")
+            .then(data => {
+                // add a div element for our drop down menu
+                d3.select("body")
+                    .append("div")
+                    .attr("id", "dropDownMenu")
+
+                // define the initial timeline
+                let nestByYear = Array.from(d3.group(data, d => d.Year));
+
+                // Sort the nestByYear array in ascending order
+                nestByYear.sort((a, b) => a[0] - b[0]);
+
+                // create elements for actual drop-down menu
+                let dropDownMenu = d3.select("#dropDownMenu");
+                dropDownMenu
+                    .append("select")
+                    .selectAll("option")
+                    .data(nestByYear)
+                    .enter()
+                    .append("option")
+                    .attr("value", d => d[0])
+                    .text(d => d[0])
+
+                // adding value to the elements
+                dropDownMenu
+                    .on('change', function (e, d) {
+                        let menuItem = d3.select(this)
+                            .select("select")
+                            .property("value");
+                        updateTimeline(menuItem);
+                        updatabuddle(menuItem);
+                        updatachart1(menuItem);
+                    });
+
+                // List of subgroups = header of the csv files = soil condition here
+                const subgroups = data.columns.slice(2);
+
+                // List of groups = species here = value of the first column called group -> I show them on the X axis
+                const groups = data.map(d => d.Genre);
+
+                // Add X axis
+                const x = d3.scaleBand()
+                    .domain(groups)
+                    .range([0, width3])
+                    .padding([0.2]);
+                svg3.append("g")
+                    .attr("class", "x-axis")
+                    .attr("transform", `translate(0, ${height3})`)
+                    .call(d3.axisBottom(x).tickSizeOuter(0));
+
+                // Add Y axis
+                const y = d3.scaleLinear()
+                    .domain([0, 35])
+                    .range([height3, 0]);
+                svg3.append("g")
+                    .call(d3.axisLeft(y));
+
+                // color palette = one color per subgroup
+                console.log(subgroups);
+                const color = d3.scaleOrdinal()
+                    .domain(subgroups)
+                    .range(['#3C76AF', '#C6B3D3', '#F4C17B', '#EE8632']);
+                let legendrect = svg3.append('g')
+                    .selectAll(".legend")
+                    .data(color.domain())
+                    .enter()
+                    .append("g")
+                    .attr("class", "legend3")
+                    .attr("transform", (d, i) => `translate(${0}, ${i * 30})`)
+                // .attr('transform','rotate(0)');
+
+                legendrect.append("rect")
+                    .attr("x", innerWidth + 50)
+                    .attr("width", 18)
+                    .attr("height", 18)
+                    .style("fill", color)
+                    .style('display', 'inline-block')
+
+                legendrect.append("text")
+                    .attr("x", innerWidth + 45)
+                    .attr("y", 9)
+                    .attr("dy", ".35em")
+                    .style("text-anchor", "end")
+                    .text(d => d);
+                // stack the data? --> stack per subgroup
+                const stackedData = d3.stack()
+                    .keys(subgroups)
+                    (data);
+
+                // Create a tooltip
+                const tooltip = d3.select("#my_dataviz")
+                    .append("div")
+                    .style("opacity", 0)
+                    .attr("class", "tooltip")
+                    .style("background-color", "white")
+                    .style("border", "solid")
+                    .style("border-width", "1px")
+                    .style("border-radius", "5px")
+                    .style("padding", "3px")
+                    .style('position', 'absolute')
+
+
+
+                // Three function that change the tooltip when user hover / move / leave a cell
+                const mouseover = function (event, d) {
+                    const subgroupName = d3.select(this.parentNode).datum().key;
+                    const subgroupValue = d.data[subgroupName];
+                    tooltip
+                        .html("subgroup: " + subgroupName + "<br>" + "Value: " + subgroupValue)
+                        .style("opacity", 1)
+                        .style("left", (event.x) + "px")
+                        .style("top", (event.y) + "px");
+                }
+                //      const mousemove = function (event, d) {
+                //        tooltip
+
+                // //.style("transform", "translateY(-55%)")
+                //      }
+                const mouseleave = function (event, d) {
+                    tooltip.style("opacity", 0);
+                }
+
+                // add enter 
+                // Show the bars
+                svg3.selectAll(".svg3_g")
+                    // Enter in the stack data = loop key per key = group per group
+                    .data(stackedData)
+                    .join("g")
+                    .attr("class", "bar-group") // Add this line
+                    .attr("fill", d => color(d.key))
+                    .selectAll("rect")
+                    // enter a second time = loop subgroup per subgroup to add all rectangles
+                    .data(d => d)
+                    .join("rect")
+                    .attr("x", d => x(d.data.Genre))
+                    .attr("y", d => y(d[1]))
+                    .attr("height", d => y(d[0]) - y(d[1]))
+                    .attr("width", x.bandwidth())
+                    .attr("stroke", "grey")
+                    .on("mouseover", mouseover)
+                    .on("mouseleave", mouseleave);
+
+
+                // Create an update timeline function
+                function updateTimeline(Year) {
+                    // Filter the data based on the selected year
+                    const updatedData = nestByYear.find(d => d[0] === Year)[1];
+
+                    // Update the domain of the X-axis
+                    x.domain(updatedData.map(d => d.Genre));
+
+                    // Update the stackedData based on the updatedData
+                    const stackedData = d3.stack()
+                        .keys(subgroups)
+                        (updatedData);
+
+                    // Remove old bars
+                    svg3.selectAll(".bar-group").remove(); // Add this line to remove old bars
+
+                    // Add new bars
+                    const barGroups = svg3.selectAll("g.bar-group")
+                        .data(stackedData)
+                        .enter()
+                        .append("g")
+                        .attr("class", "bar-group")
+                        .attr("fill", d => color(d.key));
+
+                    barGroups.selectAll("rect")
+                        .data(d => d)
+                        .join("rect")
+                        .attr("x", d => x(d.data.Genre))
+                        .attr("y", d => y(d[1]))
+                        .attr("height", d => y(d[0]) - y(d[1]))
+                        .attr("width", x.bandwidth())
+                        .attr("stroke", "grey")
+                        .on("mouseover", mouseover)
+                        // .on("mousemove", mousemove)
+                        .on("mouseleave", mouseleave);
+
+                    // Update the X-axis
+                    svg3.select("g.x-axis")
+                        .call(d3.axisBottom(x).tickSizeOuter(0));
+                }
+
+                //Initialize the chart with the first year's data
+                updateTimeline(nestByYear[0][0]);
+                updatabuddle(nestByYear[0][0])
+
+            });
+
+
+    })()
+
+</script>
+<footer class="container-fluid py-5" style="margin-top: 5px;"></footer>>
+<div class="row">
+    <div class="col-12 col-md">
+        <img src="data_image.png" alt="Bootstrap" width="24" height="24">
+        <small class="d-block mb-3 text-body-secondary"> Information visualization </small>
+    </div>
+    <div class="col-6 col-md">
+        <h5>Student number</h5>
+        <ul class="list-unstyled text-small">
+            <li><a class="link-secondary" href="#">180020555</a></li>
+            <li><a class="link-secondary" href="#">220011707</a></li>
+        </ul>
+    </div>
+
+    <div class="col-6 col-md">
+        <h5>About</h5>
+        <ul class="list-unstyled text-small">
+            <li><a class="link-secondary" href="#">HCI</a></li>
+            <li><a class="link-secondary" href="#">5044</a></li>
+        </ul>
+    </div>
+</div>
+</footer>
+
+
+</html>
